@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nightwatch — World Clock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@200;300;400;500;600;700&family=Rajdhani:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --night:#03060d; --ink:#0a121e; --steel:#5c6c84; --moon:#dfe6f0;
+    --signal:#f0bf57; --signal-dim:#b8923c; --glow:rgba(240,191,87,.45);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--night);color:var(--moon);font-family:"Rajdhani",system-ui,sans-serif;overflow:hidden;position:relative;min-height:100vh}
+
+  #scene{position:fixed;inset:0;z-index:0;width:100%;height:100%;display:block}
+  #fx{position:fixed;inset:0;z-index:1;pointer-events:none}
+  .vignette{position:fixed;inset:0;z-index:2;pointer-events:none;background:radial-gradient(130% 120% at 50% 42%,transparent 50%,rgba(0,0,0,.62) 100%)}
+
+  .stage{position:relative;z-index:10;min-height:100vh;display:flex;flex-direction:column;padding:clamp(18px,3vw,34px)}
+  .topbar{display:flex;justify-content:space-between;align-items:center;font-family:"Oswald",sans-serif}
+  .wordmark{display:flex;align-items:center;gap:.55rem;font-weight:600;letter-spacing:.32em;font-size:.82rem;text-transform:uppercase}
+  .wordmark .mark{width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:12px solid var(--signal);filter:drop-shadow(0 0 6px var(--glow))}
+  .wordmark b{font-weight:700;color:var(--signal)}
+  .controls{display:flex;gap:.5rem}
+  .ghost-btn{font-family:"Oswald",sans-serif;font-weight:500;letter-spacing:.15em;font-size:.74rem;text-transform:uppercase;color:var(--steel);background:rgba(255,255,255,.03);border:1px solid rgba(122,140,170,.28);border-radius:2px;padding:.5rem .85rem;cursor:pointer;transition:all .2s ease}
+  .ghost-btn:hover,.ghost-btn:focus-visible{color:var(--signal);border-color:var(--signal-dim);outline:none}
+
+  .hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:.4rem}
+  .eyebrow{font-family:"Oswald",sans-serif;font-weight:400;letter-spacing:.5em;text-transform:uppercase;font-size:clamp(.62rem,1.4vw,.86rem);color:var(--steel);display:flex;align-items:center;gap:.7em;min-height:1.4em}
+  .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--signal);box-shadow:0 0 10px var(--glow);animation:blink 2.4s ease-in-out infinite}
+  @keyframes blink{0%,100%{opacity:.35}50%{opacity:1}}
+
+  .time{font-family:"Oswald",sans-serif;font-weight:300;font-variant-numeric:tabular-nums;font-size:clamp(3.6rem,17vw,12rem);line-height:.92;letter-spacing:.02em;color:var(--moon);text-shadow:0 0 34px rgba(223,230,240,.16),0 8px 46px rgba(0,0,0,.7)}
+  .time .sec{color:var(--signal);font-weight:400;text-shadow:0 0 24px var(--glow)}
+  .time .colon{color:var(--steel);animation:tick 1s steps(1) infinite}
+  @keyframes tick{50%{opacity:.28}}
+
+  .meta{display:flex;align-items:center;gap:1.2rem;flex-wrap:wrap;justify-content:center;font-family:"Oswald",sans-serif;font-weight:300;color:var(--steel);letter-spacing:.18em;text-transform:uppercase;font-size:clamp(.7rem,1.6vw,.95rem);margin-top:.3rem}
+  .meta .ampm{color:var(--signal);font-weight:500}
+  .meta .div{color:rgba(122,140,170,.4)}
+
+  .picker{margin-top:1.6rem;position:relative;display:inline-block}
+  .picker select{appearance:none;-webkit-appearance:none;font-family:"Oswald",sans-serif;font-weight:400;letter-spacing:.16em;text-transform:uppercase;font-size:clamp(.78rem,1.7vw,.96rem);color:var(--moon);background:rgba(8,12,20,.78);border:1px solid rgba(122,140,170,.3);border-radius:3px;padding:.7rem 2.8rem .7rem 1.1rem;cursor:pointer;max-width:86vw;text-overflow:ellipsis;backdrop-filter:blur(6px);transition:border-color .2s ease,box-shadow .2s ease}
+  .picker select:hover,.picker select:focus-visible{border-color:var(--signal-dim);box-shadow:0 0 0 1px rgba(240,191,87,.25);outline:none}
+  .picker::after{content:"";position:absolute;right:1.05rem;top:50%;width:0;height:0;transform:translateY(-30%);border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid var(--signal);pointer-events:none}
+  .picker select option{background:#070b12;color:var(--moon)}
+
+  .strip{display:flex;gap:.65rem;justify-content:center;flex-wrap:wrap;padding:1.4rem 0 .4rem}
+  .city{min-width:104px;background:rgba(8,12,20,.55);backdrop-filter:blur(6px);border:1px solid rgba(122,140,170,.22);border-radius:4px;padding:.6rem .8rem;cursor:pointer;text-align:left;transition:all .2s ease}
+  .city:hover,.city:focus-visible{border-color:var(--signal-dim);transform:translateY(-2px);outline:none}
+  .city.active{border-color:var(--signal);box-shadow:0 0 18px rgba(240,191,87,.15)}
+  .city .nm{font-family:"Oswald",sans-serif;font-weight:500;letter-spacing:.14em;text-transform:uppercase;font-size:.66rem;color:var(--steel)}
+  .city.active .nm{color:var(--signal)}
+  .city .tm{font-family:"Oswald",sans-serif;font-weight:300;font-variant-numeric:tabular-nums;font-size:1.25rem;color:var(--moon);line-height:1.2}
+  .city .off{font-size:.6rem;color:rgba(122,140,170,.7);letter-spacing:.1em}
+
+  footer{text-align:center;padding-top:.6rem;font-family:"Oswald",sans-serif;font-weight:300;font-size:.66rem;letter-spacing:.3em;text-transform:uppercase;color:rgba(122,140,170,.5)}
+
+  @media (max-width:560px){
+    .strip{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;-webkit-overflow-scrolling:touch}
+    .city{flex:0 0 auto}
+    .wordmark{font-size:.66rem;letter-spacing:.22em}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .eyebrow .dot,.time .colon{animation:none}
+  }
+</style>
+</head>
+<body>
+  <svg id="scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true"></svg>
+  <canvas id="fx"></canvas>
+  <div class="vignette"></div>
+
+  <div class="stage">
+    <div class="topbar">
+      <div class="wordmark"><span class="mark"></span>NIGHT<b>WATCH</b></div>
+      <div class="controls">
+        <button class="ghost-btn" id="localBtn">Local</button>
+        <button class="ghost-btn" id="fmtBtn">24H</button>
+      </div>
+    </div>
+    <div class="hero">
+      <div class="eyebrow"><span class="dot"></span><span id="zoneLabel">— · signal online</span></div>
+      <div class="time" id="time">00<span class="colon">:</span>00<span class="colon">:</span>00</div>
+      <div class="meta"><span class="ampm" id="ampm"></span><span class="div">/</span><span id="date">—</span></div>
+      <div class="picker"><select id="tz" aria-label="Choose time zone"></select></div>
+      <div class="strip" id="strip"></div>
+    </div>
+    <footer id="foot">Nightwatch · World Clock</footer>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const reduce = matchMedia("(prefers-reduced-motion:reduce)").matches;
+
+  /* ===================== CINEMATIC BACKDROP ===================== */
+  (function buildScene(){
+    const W=1600,H=900,ground=900,R=(a,b)=>a+Math.random()*(b-a);
+    const sx=1130,sy=560,dx=905,dy=150;   // signal source + cloud target
+    let s="";
+
+    s+=`<defs>
+      <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#02040a"/><stop offset="0.45" stop-color="#070d18"/>
+        <stop offset="0.78" stop-color="#0d1726"/><stop offset="1" stop-color="#13202f"/>
+      </linearGradient>
+      <radialGradient id="pollution" cx="50%" cy="100%" r="75%">
+        <stop offset="0" stop-color="#3a2a12" stop-opacity="0.55"/><stop offset="0.4" stop-color="#241a10" stop-opacity="0.3"/><stop offset="1" stop-color="#241a10" stop-opacity="0"/>
+      </radialGradient>
+      <radialGradient id="moonG" cx="38%" cy="34%" r="68%">
+        <stop offset="0" stop-color="#f4f7fb"/><stop offset="0.55" stop-color="#cdd5e2"/><stop offset="1" stop-color="#8b94a6"/>
+      </radialGradient>
+      <radialGradient id="moonHalo" cx="50%" cy="50%" r="50%">
+        <stop offset="0" stop-color="rgba(210,222,240,0.35)"/><stop offset="1" stop-color="rgba(210,222,240,0)"/>
+      </radialGradient>
+      <linearGradient id="beamG" x1="0" y1="1" x2="0" y2="0">
+        <stop offset="0" stop-color="rgba(245,232,200,0.5)"/><stop offset="0.5" stop-color="rgba(240,210,150,0.16)"/><stop offset="1" stop-color="rgba(240,210,150,0)"/>
+      </linearGradient>
+      <radialGradient id="signalDisc" cx="50%" cy="50%" r="50%">
+        <stop offset="0" stop-color="rgba(250,236,200,0.5)"/><stop offset="0.35" stop-color="rgba(240,191,87,0.22)"/><stop offset="1" stop-color="rgba(240,191,87,0)"/>
+      </radialGradient>
+      <filter id="clouds" x="-30%" y="-30%" width="160%" height="160%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.006 0.013" numOctaves="5" seed="11" stitchTiles="stitch" result="n"/>
+        <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.62  0 0 0 0 0.68  0 0 0 0 0.78  0 0 0 0.9 0"/>
+      </filter>
+      <filter id="smog" x="-30%" y="-30%" width="160%" height="160%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.004 0.02" numOctaves="4" seed="4" stitchTiles="stitch" result="n"/>
+        <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.30  0 0 0 0 0.24  0 0 0 0 0.16  0 0 0 0.9 0"/>
+      </filter>
+      <filter id="haze"><feGaussianBlur stdDeviation="3.2"/></filter>
+      <filter id="beamBlur"><feGaussianBlur stdDeviation="9"/></filter>
+      <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter>
+      <mask id="cloudMask">
+        <linearGradient id="cm" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="0.18" stop-color="#fff" stop-opacity="0.85"/>
+          <stop offset="0.5" stop-color="#fff" stop-opacity="0.5"/><stop offset="0.72" stop-color="#fff" stop-opacity="0"/>
+        </linearGradient>
+        <rect x="0" y="0" width="${W}" height="${H}" fill="url(#cm)"/>
+      </mask>
+    </defs>`;
+
+    s+=`<rect x="0" y="0" width="${W}" height="${H}" fill="url(#sky)"/>`;
+    s+=`<rect x="0" y="${H*0.45}" width="${W}" height="${H*0.55}" fill="url(#pollution)"/>`;
+
+    let stars="";
+    for(let i=0;i<70;i++){const x=R(0,W),y=R(0,H*0.5),r=R(0.4,1.3),o=R(0.2,0.8).toFixed(2);
+      const tw = !reduce && Math.random()<0.4 ? `<animate attributeName="opacity" values="${o};${(o*0.3).toFixed(2)};${o}" dur="${R(2.5,6).toFixed(1)}s" repeatCount="indefinite"/>`:"";
+      stars+=`<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r.toFixed(1)}" fill="#dfe6f0" opacity="${o}">${tw}</circle>`;}
+    s+=`<g>${stars}</g>`;
+
+    const mx=1240,my=180,mr=70;
+    s+=`<circle cx="${mx}" cy="${my}" r="${mr*2.4}" fill="url(#moonHalo)"/>`;
+    s+=`<circle cx="${mx}" cy="${my}" r="${mr}" fill="url(#moonG)"/>`;
+    s+=`<g opacity="0.25" fill="#7d8699"><circle cx="${mx-22}" cy="${my-14}" r="9"/><circle cx="${mx+16}" cy="${my+8}" r="13"/><circle cx="${mx+4}" cy="${my-26}" r="6"/><circle cx="${mx-12}" cy="${my+24}" r="7"/><circle cx="${mx+30}" cy="${my-20}" r="5"/></g>`;
+
+    // drifting clouds
+    const cloudAnim = reduce?"":`<animateTransform attributeName="transform" type="translate" values="0 0; -130 8; 0 0" dur="70s" repeatCount="indefinite"/>`;
+    s+=`<g mask="url(#cloudMask)" opacity="0.5"><rect x="-300" y="0" width="${W+600}" height="${H*0.62}" filter="url(#clouds)"/>${cloudAnim}</g>`;
+
+    // signal: beam + projected disc (sweeping), source orb fixed at pivot
+    const beamAnim = reduce?"":`<animateTransform attributeName="transform" type="rotate" values="-4 ${sx} ${sy}; 5 ${sx} ${sy}; -4 ${sx} ${sy}" dur="15s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>`;
+    const bw=26,tw=150;
+    s+=`<g style="mix-blend-mode:screen">${beamAnim}
+        <g filter="url(#beamBlur)" opacity="0.55"><polygon points="${sx-bw/2},${sy} ${sx+bw/2},${sy} ${dx+tw/2},${dy} ${dx-tw/2},${dy}" fill="url(#beamG)"/></g>
+        <ellipse cx="${dx}" cy="${dy}" rx="150" ry="95" fill="url(#signalDisc)"/>
+      </g>`;
+    const srcAnim = reduce?"":`<animate attributeName="opacity" values="0.85;1;0.8;1" dur="3.5s" repeatCount="indefinite"/>`;
+    s+=`<g>${srcAnim}<circle cx="${sx}" cy="${sy}" r="16" fill="url(#signalDisc)"/><circle cx="${sx}" cy="${sy}" r="6" fill="#fbf0d0"/></g>`;
+
+    // ---- skyline ----
+    function windowsFor(x,y,w,h,o){
+      let out="";
+      for(let cx=x+6;cx<x+w-6;cx+=o.gx){
+        for(let cy=y+8;cy<y+h-4;cy+=o.gy){
+          if(Math.random()<o.chance){
+            const warm=Math.random()<0.82, col=warm?"#f0c46a":"#9fc2e8";
+            const op=(warm?R(0.35,0.9):R(0.25,0.6)).toFixed(2);
+            const tw=!reduce && Math.random()<0.14 ? `<animate attributeName="opacity" values="${op};0.08;${op}" dur="${R(2,7).toFixed(1)}s" repeatCount="indefinite"/>`:"";
+            out+=`<rect x="${cx.toFixed(0)}" y="${cy.toFixed(0)}" width="${o.ww}" height="${o.wh}" fill="${col}" opacity="${op}">${tw}</rect>`;
+          }
+        }
+      }
+      return out;
+    }
+    function layer(o){
+      let g="",x=-30;
+      while(x<W+30){
+        const w=R(o.minW,o.maxW),h=R(o.minH,o.maxH),y=o.base-h;
+        g+=`<rect x="${x.toFixed(0)}" y="${y.toFixed(0)}" width="${w.toFixed(0)}" height="${(o.base-y).toFixed(0)}" fill="${o.fill}"/>`;
+        if(o.rim)g+=`<rect x="${x.toFixed(0)}" y="${y.toFixed(0)}" width="${w.toFixed(0)}" height="1.5" fill="rgba(120,140,170,0.35)"/>`;
+        if(o.win)g+=windowsFor(x,y,w,(o.base-y),o.win);
+        x+=w-R(2,10);
+      }
+      return g;
+    }
+    s+=`<g filter="url(#haze)" opacity="0.7">${layer({base:705,minW:34,maxW:80,minH:90,maxH:240,fill:"#16212f",win:{gx:13,gy:16,ww:3,wh:4,chance:0.12}})}</g>`;
+    s+=`<g>${layer({base:790,minW:48,maxW:120,minH:160,maxH:380,fill:"#0a121d",rim:true,win:{gx:14,gy:18,ww:4,wh:6,chance:0.17}})}</g>`;
+    s+=`<g>${layer({base:905,minW:70,maxW:165,minH:230,maxH:430,fill:"#04070d",rim:true,win:{gx:18,gy:22,ww:5,wh:7,chance:0.13}})}</g>`;
+
+    // landmark tower (the signal rooftop) with red beacon
+    const lx=1075,lw=120,lh=470,ly=ground-lh;
+    const beac1=reduce?"":`<animate attributeName="opacity" values="1;0.2;1" dur="2.2s" repeatCount="indefinite"/>`;
+    s+=`<g>
+      <rect x="${lx}" y="${ly}" width="${lw}" height="${lh}" fill="#03060b"/>
+      <rect x="${lx+22}" y="${ly-40}" width="${lw-44}" height="44" fill="#03060b"/>
+      <rect x="${lx+42}" y="${ly-78}" width="${lw-84}" height="40" fill="#03060b"/>
+      <rect x="${lx+lw/2-2}" y="${ly-150}" width="4" height="74" fill="#03060b"/>
+      <circle cx="${lx+lw/2}" cy="${ly-150}" r="3.5" fill="#ff5a4d">${beac1}</circle>
+      ${windowsFor(lx,ly,lw,lh,{gx:20,gy:26,ww:5,wh:8,chance:0.16})}
+    </g>`;
+    const beac2=reduce?"":`<animate attributeName="opacity" values="1;0.2;1" dur="1.7s" repeatCount="indefinite"/>`;
+    s+=`<g><rect x="250" y="${ground-300}" width="14" height="300" fill="#03060b"/><rect x="246" y="${ground-340}" width="22" height="44" fill="#03060b"/><circle cx="257" cy="${ground-342}" r="3" fill="#ff5a4d">${beac2}</circle></g>`;
+
+    // drifting low smog
+    const smogAnim=reduce?"":`<animateTransform attributeName="transform" type="translate" values="0 0; 170 0; 0 0" dur="48s" repeatCount="indefinite"/>`;
+    s+=`<g opacity="0.4" style="mix-blend-mode:screen"><rect x="-300" y="${ground-260}" width="${W+600}" height="300" filter="url(#smog)"/>${smogAnim}</g>`;
+
+    s+=`<rect x="0" y="0" width="${W}" height="${H}" filter="url(#grain)" opacity="0.05" style="mix-blend-mode:overlay"/>`;
+    document.getElementById("scene").innerHTML=s;
+  })();
+
+  /* ===================== CANVAS: bats + rain ===================== */
+  const cv=document.getElementById("fx"), ctx=cv.getContext("2d");
+  let W,H,drops=[],bats=[];
+  function resize(){W=cv.width=innerWidth*devicePixelRatio;H=cv.height=innerHeight*devicePixelRatio;cv.style.width=innerWidth+"px";cv.style.height=innerHeight+"px";}
+  resize();
+  function spawnBat(any){
+    const dir=Math.random()>0.5?1:-1;
+    bats.push({x:any?Math.random()*W:(dir>0?-50:W+50),y:(0.06+Math.random()*0.42)*H,vx:dir*(0.5+Math.random()*1.2)*devicePixelRatio,s:(0.8+Math.random()*1.6)*devicePixelRatio,ph:Math.random()*6.28,dir});
+  }
+  function seed(){
+    drops=[];const n=Math.round((innerWidth*innerHeight)/13000);
+    for(let i=0;i<n;i++)drops.push({x:Math.random()*W,y:Math.random()*H,len:(8+Math.random()*16)*devicePixelRatio,sp:(4+Math.random()*6)*devicePixelRatio,op:0.05+Math.random()*0.15});
+    bats=[];for(let i=0;i<8;i++)spawnBat(true);
+  }
+  function drawBat(b){
+    const flap=0.45+Math.abs(Math.sin(b.ph))*1.25;
+    ctx.save();ctx.translate(b.x,b.y);ctx.scale(b.s*b.dir,b.s);
+    ctx.beginPath();ctx.moveTo(0,0);
+    ctx.quadraticCurveTo(-7,-5*flap,-15,-1);ctx.quadraticCurveTo(-9,2,-6,7);
+    ctx.quadraticCurveTo(-4,1,0,4);ctx.quadraticCurveTo(4,1,6,7);
+    ctx.quadraticCurveTo(9,2,15,-1);ctx.quadraticCurveTo(7,-5*flap,0,0);
+    ctx.closePath();ctx.fillStyle="rgba(5,8,13,.94)";ctx.fill();ctx.restore();
+  }
+  function frame(){
+    ctx.clearRect(0,0,W,H);
+    ctx.lineWidth=1*devicePixelRatio;
+    for(const d of drops){ctx.strokeStyle=`rgba(150,170,200,${d.op})`;ctx.beginPath();ctx.moveTo(d.x,d.y);ctx.lineTo(d.x-d.len*0.18,d.y+d.len);ctx.stroke();d.y+=d.sp;d.x-=d.sp*0.18;if(d.y>H){d.y=-d.len;d.x=Math.random()*W;}}
+    for(const b of bats){b.x+=b.vx;b.ph+=0.25;b.y+=Math.sin(b.ph*0.5)*0.4*devicePixelRatio;drawBat(b);}
+    bats=bats.filter(b=>b.x>-70&&b.x<W+70);while(bats.length<8)spawnBat(false);
+    requestAnimationFrame(frame);
+  }
+  if(!reduce){seed();requestAnimationFrame(frame);addEventListener("resize",()=>{resize();seed();});}
+  else addEventListener("resize",resize);
+
+  /* ===================== CLOCK ENGINE ===================== */
+  const store={get(k){try{return localStorage.getItem(k);}catch(e){return null;}},set(k,v){try{localStorage.setItem(k,v);}catch(e){}}};
+  const localZone=Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC";
+  let zone=store.get("nw_zone")||localZone, hour24=store.get("nw_fmt")==="24";
+  const elTime=document.getElementById("time"),elAmpm=document.getElementById("ampm"),elDate=document.getElementById("date"),elZone=document.getElementById("zoneLabel"),elFoot=document.getElementById("foot");
+
+  function partsFor(tz,date){const f=new Intl.DateTimeFormat("en-US",{timeZone:tz,hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit",weekday:"short",day:"2-digit",month:"short",year:"numeric"}).formatToParts(date);const o={};for(const p of f)o[p.type]=p.value;return o;}
+  function offsetStr(tz,date){const tn=new Intl.DateTimeFormat("en-US",{timeZone:tz,timeZoneName:"shortOffset",hour:"2-digit"}).formatToParts(date).find(p=>p.type==="timeZoneName");return tn?tn.value.replace("GMT","UTC"):"";}
+  const pretty=tz=>tz.replace(/_/g," ").replace("/"," / ");
+
+  function render(){
+    const now=new Date(),p=partsFor(zone,now);let h=parseInt(p.hour,10),ampm="";
+    if(!hour24){ampm=h>=12?"PM":"AM";h=h%12||12;}
+    elTime.innerHTML=`${String(h).padStart(2,"0")}<span class="colon">:</span>${p.minute}<span class="colon">:</span><span class="sec">${p.second}</span>`;
+    elAmpm.textContent=ampm;elDate.textContent=`${p.weekday}, ${p.day} ${p.month} ${p.year}`;
+    elZone.textContent=`${pretty(zone)} · ${offsetStr(zone,now)}`;elFoot.textContent=`Nightwatch · ${pretty(zone)}`;
+    for(const c of document.querySelectorAll(".city")){const tz=c.dataset.tz,cp=partsFor(tz,now);let ch=parseInt(cp.hour,10),sfx="";if(!hour24){sfx=ch>=12?" PM":" AM";ch=ch%12||12;}c.querySelector(".tm").textContent=`${String(ch).padStart(2,"0")}:${cp.minute}${sfx}`;c.querySelector(".off").textContent=offsetStr(tz,now);c.classList.toggle("active",tz===zone);}
+  }
+
+  const sel=document.getElementById("tz");
+  let zoneList;try{zoneList=Intl.supportedValuesOf("timeZone");}catch(e){zoneList=null;}
+  if(!zoneList||!zoneList.length)zoneList=["UTC","America/New_York","America/Chicago","America/Denver","America/Los_Angeles","America/Sao_Paulo","Europe/London","Europe/Paris","Europe/Berlin","Europe/Moscow","Africa/Cairo","Africa/Johannesburg","Asia/Dubai","Asia/Kolkata","Asia/Singapore","Asia/Shanghai","Asia/Tokyo","Australia/Sydney","Pacific/Auckland"];
+  if(!zoneList.includes(zone))zoneList=[zone,...zoneList];
+  for(const tz of zoneList){const o=document.createElement("option");o.value=tz;o.textContent=pretty(tz);if(tz===zone)o.selected=true;sel.appendChild(o);}
+  sel.addEventListener("change",()=>{zone=sel.value;store.set("nw_zone",zone);render();});
+
+  const cities=[["Local",localZone],["New York","America/New_York"],["London","Europe/London"],["Paris","Europe/Paris"],["Dubai","Asia/Dubai"],["Tokyo","Asia/Tokyo"],["Sydney","Australia/Sydney"]];
+  const strip=document.getElementById("strip"),seen=new Set();
+  for(const [name,tz] of cities){if(seen.has(tz))continue;seen.add(tz);const c=document.createElement("button");c.className="city";c.dataset.tz=tz;c.innerHTML=`<div class="nm">${name}</div><div class="tm">--:--</div><div class="off"></div>`;c.addEventListener("click",()=>{zone=tz;store.set("nw_zone",zone);if([...sel.options].some(o=>o.value===tz))sel.value=tz;render();});strip.appendChild(c);}
+
+  const fmtBtn=document.getElementById("fmtBtn");const syncFmt=()=>fmtBtn.textContent=hour24?"12H":"24H";syncFmt();
+  fmtBtn.addEventListener("click",()=>{hour24=!hour24;store.set("nw_fmt",hour24?"24":"12");syncFmt();render();});
+  document.getElementById("localBtn").addEventListener("click",()=>{zone=localZone;store.set("nw_zone",zone);if([...sel.options].some(o=>o.value===localZone))sel.value=localZone;render();});
+
+  render();setInterval(render,250);
+})();
+</script>
+</body>
+</html>
